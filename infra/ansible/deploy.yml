@@ -1,0 +1,90 @@
+---
+# infra/ansible/deploy.yml
+# Ce playbook installe Docker sur la VM et déploie l'application
+
+- name: Déploiement de l'application Todo sur staging
+  hosts: staging
+  become: true   # Exécute les commandes en sudo
+
+  vars:
+    app_dir: /opt/todo-devops
+    db_name: tododb
+    db_user: todouser
+    db_password: todopass
+
+  tasks:
+
+    # ── 1. Installation de Docker ──────────────────────────────────
+    - name: Installer les dépendances Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: true
+
+    - name: Ajouter la clé GPG officielle Docker
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+    - name: Ajouter le dépôt Docker
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Installer Docker Engine et Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Démarrer et activer Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    # ── 2. Préparer le répertoire de l'application ─────────────────
+    - name: Créer le dossier de l'application
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    # ── 3. Copier le docker-compose de production ──────────────────
+    - name: Copier le docker-compose.prod.yml
+      template:
+        src: docker-compose.prod.yml.j2
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: "0644"
+
+    # ── 4. Déployer les conteneurs ─────────────────────────────────
+    - name: Puller les nouvelles images Docker
+      shell: docker compose pull
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Lancer les conteneurs (ou les redémarrer si déjà lancés)
+      shell: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Vérifier que le backend répond
+      uri:
+        url: http://localhost:5000/health
+        status_code: 200
+      retries: 5
+      delay: 5
+
+    - name: ✅ Déploiement terminé
+      debug:
+        msg: "Application déployée avec succès sur {{ inventory_hostname }}"
