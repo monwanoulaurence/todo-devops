@@ -119,8 +119,8 @@ jobs:
   deploy-staging:
     name: 🚀 Deploy sur Staging (OVH)
     runs-on: ubuntu-latest
-    needs: [build, test]                          # Attend que build ET test soient OK
-    if: github.ref == 'refs/heads/main'           # Seulement sur main
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout du code
@@ -137,6 +137,13 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Générer le fichier inventory avec la vraie IP
+        run: |
+          cat > infra/ansible/inventory.ini << EOF
+          [staging]
+          staging-server ansible_host=${{ secrets.STAGING_HOST }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+          EOF
 
       - name: Lancer le playbook Ansible (deploy)
         run: |
