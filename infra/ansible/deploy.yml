@@ -14,44 +14,37 @@
 
   tasks:
 
-    # ── 1. Installation de Docker ──────────────────────────────────
-    - name: Installer les dépendances Docker
-      apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gnupg
-          - lsb-release
-        state: present
-        update_cache: true
+    # ── 1. Installation de Docker via script officiel ──────────────
+    - name: Vérifier si Docker est déjà installé
+      command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
 
-    - name: Ajouter la clé GPG officielle Docker
-      shell: |
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-      args:
-        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+    - name: Télécharger et exécuter le script d'installation Docker
+      shell: curl -fsSL https://get.docker.com | sh
+      when: docker_check.rc != 0
 
-    - name: Ajouter le dépôt Docker
-      apt_repository:
-        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-        state: present
-
-    - name: Installer Docker Engine et Docker Compose
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-compose-plugin
-        state: present
-        update_cache: true
+    - name: Ajouter l'utilisateur ubuntu au groupe docker
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
 
     - name: Démarrer et activer Docker
       systemd:
         name: docker
         state: started
         enabled: true
+
+    - name: Vérifier que Docker fonctionne
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Afficher la version Docker installée
+      debug:
+        msg: "✅ {{ docker_version.stdout }}"
 
     # ── 2. Préparer le répertoire de l'application ─────────────────
     - name: Créer le dossier de l'application
