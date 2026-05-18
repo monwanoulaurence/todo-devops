@@ -8,6 +8,7 @@ on:
     branches: [main]
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/todo-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/todo-frontend
